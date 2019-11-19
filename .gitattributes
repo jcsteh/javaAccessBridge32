@@ -1,3 +1,4 @@
 .gitattributes text
 .gitignore text
 sconstruct text
+*.md text

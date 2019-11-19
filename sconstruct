@@ -1,0 +1,60 @@
+# SConstruct to build Java Access Bridge 32 bit
+# Author: James Teh <jamie@jantrid.net>
+# Copyright 2019 James Teh
+# License: GNU General Public License version 2.0
+
+import datetime
+
+# Build everything (including object files) in the "build" directory.
+# After this, we must always refer to jdk/whatever as build/whatever so SCons
+# builds in our build directory.
+VariantDir("build", "jdk", duplicate=False)
+env = Environment(TARGET_ARCH="x86")
+jdkDir = "build/src/"
+bridgeDir = jdkDir + "jdk.accessibility/windows/native/"
+
+def getVersionData():
+	input = open("jdk/make/autoconf/version-numbers")
+	data = {}
+	for line in input:
+		line = line.strip()
+		if not line or line.startswith("#"):
+			continue
+		key, val = line.split("=")
+		if val.startswith('"'):
+			val = val[1:-1]
+		data[key] = val
+	return data
+
+versionData = getVersionData()
+version = "{DEFAULT_VERSION_FEATURE}.{DEFAULT_VERSION_INTERIM}.{DEFAULT_VERSION_UPDATE}.{DEFAULT_VERSION_PATCH}".format(**versionData)
+year = datetime.date.today().year
+dllPrefix = "WindowsAccessBridge-32"
+env.Append(
+	CPPPATH=[
+		jdkDir + "java.base/share/native/include",
+		jdkDir + "java.base/windows/native/include",
+		bridgeDir + "common",
+		bridgeDir + "include/bridge",
+	],
+	CPPDEFINES=[
+		"ACCESSBRIDGE_ARCH_32",
+		("JDK_FVER", version),
+		("JDK_FTYPE", "0x2l"), # VFT_DLL
+		("JDK_FILEDESC", "OpenJDK Platform binary"),
+		("JDK_NAME", "OpenJDK Platform {DEFAULT_VERSION_FEATURE}".format(**versionData)),
+		("JDK_VER", version),
+		("JDK_COPYRIGHT", "Copyright %d" % year),
+		("JDK_FNAME", dllPrefix + ".dll"),
+	],
+)
+env.SharedLibrary(
+	target="build/" + dllPrefix,
+	source=[
+		Glob(bridgeDir + "libwindowsaccessbridge/*.cpp"),
+		Glob(bridgeDir + "common/*.cpp"),
+		bridgeDir + "libwindowsaccessbridge/WinAccessBridge.def",
+		env.RES(bridgeDir + "common/AccessBridgeStatusWindow.rc"),
+	],
+	LIBS=["user32"]
+)
